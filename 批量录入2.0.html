@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>作业等级录入系统</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #4a90e2;
+      --primary-light: #eef5fd;
+      --border-color: #d0d9e2;
+      --text-dark: #333;
+      --text-light: #666;
+      --missing-bg: #fff5f5;
+      --missing-border: #ff9999;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      color: var(--text-dark);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 10px auto;
+      padding: 15px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    h2 {
+      text-align: center;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    /* 控制栏样式 */
+    .control-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding: 10px;
+      background: var(--primary-light);
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      flex-wrap: wrap; /* 允许换行以适应小屏幕 */
+      gap: 10px;
+    }
+
+    .class-toggle {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .class-toggle label {
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 16px;
+      transition: color 0.2s;
+    }
+
+    .class-toggle input[type="radio"] {
+      margin-right: 6px;
+    }
+
+    .homework-input {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      width: 150px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .homework-input:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    }
+
+    .export-btn {
+      background-color: #27ae60;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+      box-shadow: 0 2px 5px rgba(39, 174, 96, 0.2);
+    }
+
+    .export-btn:hover {
+      background-color: #219653;
+      box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+    }
+
+    /* 等级选择器 */
+    #grades {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      margin: 10px 0;
+      padding: 10px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      border: 1px dashed #ddd;
+    }
+
+    #grades button {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    #grades button:hover {
+      background: #eef5fd;
+      border-color: var(--primary-color);
+      transform: translateY(-1px);
+    }
+
+    #grades button.active {
+      background: var(--primary-color);
+      color: white;
+      border-color: var(--primary-color);
+    }
+
+    /* 表格容器 - 三栏布局 */
+    .table-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      height: 80vh; /* 视口高度，确保一屏显示 */
+//      overflow: hidden;
+    }
+
+    .column {
+      flex: 1;
+      min-width: 0; /* 防止溢出 */
+      background: white;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .column-header {
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      padding: 10px;
+      text-align: center;
+      font-weight: 600;
+      color: var(--text-dark);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #f0f4f8;
+      color: var(--text-dark);
+      padding: 10px 5px;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border-color);
+      text-align: center;
+    }
+
+    td {
+      padding: 8px 5px;
+      border-bottom: 1px solid #eee;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      height: 32px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    td:hover {
+      background-color: #f9f9f9;
+      transform: scale(1.02);
+    }
+
+    /* 未录入状态高亮 */
+    .missing {
+      background-color: var(--missing-bg) !important;
+      border-left: 4px solid var(--missing-border);
+      font-weight: 500;
+    }
+
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+      .table-container {
+        flex-direction: column;
+      }
+      .column {
+        margin-bottom: 10px;
+      }
+      .control-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .class-toggle {
+        justify-content: center;
+        margin-bottom: 10px;
+      }
+      .homework-input {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        border-radius: 0;
+      }
+      .container {
+        margin: 0;
+        border-radius: 0;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>📝 作业等级录入系统</h2>
+
+    <!-- 控制栏：班级、作业名、导出 -->
+    <div class="control-bar">
+      <div class="class-toggle">
+        <label><input type="radio" name="class" value="3班" checked> 3班</label>
+        <label><input type="radio" name="class" value="18班"> 18班</label>
+      </div>
+      
+      <input type="text" id="homeworkName" class="homework-input" placeholder="请输入作业名称（如：第一单元练习）">
+
+      <button class="export-btn" onclick="exportToExcel()">
+        📤 导出 Excel
+      </button>
+    </div>
+
+    <!-- 等级选择器 (点击切换) -->
+    <div id="grades"></div>
+
+    <!-- 三栏表格容器 -->
+    <div class="table-container" id="tableContainer"></div>
+  </div>
+
+  <script>
+    // 学生名单数据
+    const students = {
+      "3班": [
+        "卞韦皓", "陈思乐", "陈筱诺", "陈阳", "葛程", "葛雅馨", "何睿宸", "洪若琳",
+        "李欣悦", "李垚润", "李妤萱", "梁可馨", "鲁启航", "聂景贤", "沈茹昕", "宋鑫瑞",
+        "汪灏成", "汪彦汐", "王昊文", "王若宇", "王思慎", "王晓满", "吴骏涵", "谢怡然",
+        "杨博超", "杨志宏", "余皓阳", "赵瑞卿", "郑佳怡", "朱欣怡", "朱鑫烔"
+      ],
+      "18班": [
+        "崔亦晨", "杜睿婕", "贾智超", "金嘉俊", "金夕瑶", "李怡泽", "李志睿", "刘嘉乐",
+        "刘茹", "吕垣臻", "裘姃", "沈浩然", "沈瑞涵", "宋蓬", "孙小娅", "汪宸熙", "汪钰梵",
+        "王辰星", "王雨泽", "王泽阳", "王梓璇", "邢峻源", "袁思蒙", "张雨馨",
+        "赵君怡", "赵天将", "周汉平",  "周欣蕾", "周一臣", "邹依晨"
+      ]
+    };
+
+    // 存储数据
+    let classData = {};
+    Object.keys(students).forEach(cls => {
+      classData[cls] = {};
+      students[cls].forEach(name => {
+        classData[cls][name] = "";
+      });
+    });
+
+    let currentClass = "3班";
+    let selectedGrade = "A"; // 默认选中A
+
+    // 1. 生成等级按钮 (A-N)
+    function renderGrades() {
+      const container = document.getElementById("grades");
+      container.innerHTML = "";
+      
+      for (let i = 0; i < 14; i++) {
+        const grade = String.fromCharCode(65 + i); // A 到 N
+        const btn = document.createElement("button");
+        btn.textContent = grade;
+        btn.onclick = () => {
+          // 更新视觉状态
+          document.querySelectorAll('#grades button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedGrade = grade;
+        };
+        // 默认激活A
+        if (grade === "A") btn.classList.add('active');
+        container.appendChild(btn);
+      }
+    }
+
+    // 2. 渲染三栏表格 (竖向填充逻辑)
+    function renderStudents() {
+      const container = document.getElementById("tableContainer");
+      container.innerHTML = "";
+      
+      const list = students[currentClass];
+      const data = classData[currentClass];
+      const colCount = 3;
+      const colHeight = Math.ceil(list.length / colCount);
+
+      // 创建3个列
+      for (let c = 0; c < colCount; c++) {
+        const colDiv = document.createElement("div");
+        colDiv.className = "column";
+
+        // 列标题 (显示范围)
+        const header = document.createElement("div");
+        header.className = "column-header";
+        const start = c * colHeight + 1;
+        const end = Math.min((c + 1) * colHeight, list.length);
+        header.textContent = `名单 (${start}-${end})`;
+
+        const table = document.createElement("table");
+        const thead = document.createElement("thead");
+        thead.innerHTML = "<tr><th>学号</th><th>姓名</th><th>等级</th></tr>";
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+
+        // 竖向填充逻辑：先填满第一列，再填第二列
+        for (let r = 0; r < colHeight; r++) {
+          const index = c * colHeight + r; // 关键修改：这里决定了填充顺序
+          
+          if (index >= list.length) break;
+
+          const name = list[index];
+          const tr = document.createElement("tr");
+
+          // 学号
+          const td1 = document.createElement("td");
+          td1.textContent = index + 1;
+          tr.appendChild(td1);
+
+          // 姓名 (点击录入)
+          const td2 = document.createElement("td");
+          td2.textContent = name;
+          td2.onclick = (e) => handleCellClick(e, name);
+          tr.appendChild(td2);
+
+          // 等级 (点击录入/修改)
+          const td3 = document.createElement("td");
+          td3.textContent = data[name] || "点击录入";
+          td3.className = data[name] ? "" : "missing";
+          td3.onclick = (e) => handleCellClick(e, name);
+          tr.appendChild(td3);
+
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        colDiv.appendChild(header);
+        colDiv.appendChild(table);
+        container.appendChild(colDiv);
+      }
+    }
+
+    // 3. 单元格点击处理
+    function handleCellClick(event, name) {
+      // 阻止事件冒泡导致的意外行为
+      event.stopPropagation();
+      
+      // 获取当前行的等级单元格 (用于更新)
+      const row = event.target.closest('tr');
+      const gradeCell = row ? row.cells[2] : null;
+      
+      // 直接应用当前选中的等级
+      classData[currentClass][name] = selectedGrade;
+      
+      // 更新UI
+      if (gradeCell) {
+        gradeCell.textContent = selectedGrade;
+        gradeCell.classList.remove("missing");
+      }
+    }
+
+    // 4. 切换班级
+    document.querySelectorAll('input[name="class"]').forEach(radio => {
+      radio.addEventListener("change", function () {
+        if (this.checked) {
+          currentClass = this.value;
+          renderStudents();
+        }
+      });
+    });
+
+    // 5. 导出为Excel (包含作业名)
+    function exportToExcel() {
+      const wb = XLSX.utils.book_new();
+      const hwName = document.getElementById("homeworkName").value.trim() || "未命名作业";
+
+      Object.keys(classData).forEach(cls => {
+        const wsData = [["班级作业等级统计表"]];
+        wsData.push(["班级", cls, "作业名称", hwName, "日期", new Date().toLocaleDateString()]);
+        wsData.push([]); // 空行
+        wsData.push(["学号", "姓名", "等级"]);
+        
+        students[cls].forEach((name, index) => {
+          wsData.push([index + 1, name, classData[cls][name] || "未交"]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        
+        // 列宽设置
+        ws['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 10 }];
+        
+        XLSX.utils.book_append_sheet(wb, ws, cls);
+      });
+
+      // 文件名包含作业名
+      const fileName = `${hwName}_作业等级录入_${new Date().toLocaleDateString()}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    }
+
+    // 初始化
+    window.onload = function () {
+      renderGrades();
+      renderStudents();
+    };
+  </script>
+</body>
+</html>
