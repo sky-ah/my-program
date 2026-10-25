@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>学生成绩录入系统</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://s4.zstatic.net/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --primary-light: #eef5fd;
+            --border-color: #d0d9e2;
+            --text-dark: #333;
+            --text-light: #666;
+            --missing-bg: #fff5f5;
+            --missing-border: #ff9999;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+            color: var(--text-dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 10px auto;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        h2 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        /* 控制栏样式 */
+        .control-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: var(--primary-light);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .class-toggle {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .class-toggle label {
+            font-weight: 650;
+            cursor: pointer;
+            font-size: 16px;
+            transition: color 0.2s;
+        }
+
+        .class-toggle input[type="radio"] {
+            margin-right: 6px;
+        }
+
+        .exam-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            width: 180px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .exam-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+
+        .export-btn {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+            box-shadow: 0 2px 5px rgba(39, 174, 96, 0.2);
+        }
+
+        .export-btn:hover {
+            background-color: #219653;
+            box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+        }
+
+        /* 统计栏样式 */
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: #f8f9fa;
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .stats-item span {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        /* 表格容器 - 三栏布局 */
+        .table-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            height: 75vh;
+            overflow-y: auto;
+        }
+
+        .column {
+            flex: 1;
+            min-width: 0;
+            background: white;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .column-header {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-dark);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #f0f4f8;
+            color: var(--text-dark);
+            padding: 10px 5px;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+            text-align: center;
+        }
+
+        td {
+            padding: 4px 5px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+            height: 36px;
+        }
+
+        /* 成绩输入框样式 */
+        .score-input {
+            width: 80%;
+            padding: 4px 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .score-input:focus {
+            border-color: var(--primary-color);
+            background-color: #eef5fd;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+
+        .score-input.empty {
+            background-color: var(--missing-bg);
+            border-color: var(--missing-border);
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .table-container {
+                flex-direction: column;
+                height: auto;
+            }
+            .column {
+                margin-bottom: 10px;
+            }
+            .control-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .class-toggle {
+                justify-content: center;
+            }
+            .exam-input {
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .stats-bar {
+                flex-direction: column;
+                gap: 5px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>📊 学生成绩录入系统</h2>
+
+        <!-- 控制栏：班级、考试名、导出 -->
+        <div class="control-bar">
+            <div class="class-toggle">
+                <label><input type="radio" name="class" value="15班" checked /> 15班</label>
+                <label><input type="radio" name="class" value="21班" /> 21班</label>
+            </div>
+
+            <input type="text" id="examName" class="exam-input" placeholder="请输入考试/测验名称" />
+
+            <button class="export-btn" onclick="exportToExcel()">
+                📤 导出成绩单 Excel
+            </button>
+        </div>
+
+        <!-- 成绩统计面板 -->
+        <div class="stats-bar">
+            <div class="stats-item">班级人数: <span id="statTotal">0</span> 人</div>
+            <div class="stats-item">已录/缺考: <span id="statEntered">0</span> / <span id="statMissing">0</span></div>
+            <div class="stats-item">平均分: <span id="statAvg">0</span></div>
+            <div class="stats-item">最高分: <span id="statMax">0</span></div>
+            <div class="stats-item">最低分: <span id="statMin">0</span></div>
+        </div>
+
+        <!-- 三栏表格容器 -->
+        <div class="table-container" id="tableContainer"></div>
+    </div>
+
+    <script>
+        // ======================== 学生名单数据 ========================
+        const students = {
+            "15班": [
+                "陈思乐", "程罡", "程诺", "戴鸣谦", "胡昊阳",
+                "黄康悦", "黄子皓", "黄梓宸", "金铭浩", "李家烨",
+                "李笠玥", "李启奥", "李垚润", "李奕翧", "梁文杰",
+                "刘奇", "孙浩宸", "陶泽轩", "田昊昊", "魏煜林",
+                "吴昱泽", "徐端尧", "杨宇童", "余皓阳", "余心妍",
+                "袁增涛", "张公澍", "张欣妍", "张振宇", "赵煜晗",
+                "赵梓鑫", "朱宸逸", "朱轩辉", "訾璐"
+            ],
+            "21班": [
+                "安倪", "丁雨阳", "谷歆雨", "蒋沐辰", "晋昇", "雷晨涵", "冷琪涵",
+                "李皖星", "刘茹", "裘姃", "沈浩然", "孙艺嘉", "孙雨涵","王可凡",
+                "王欣妍", "奚梦辰", "项博雅", "徐芮涵", "徐泽浩", "许伟",
+                "许文茜", "许亦薇", "余蒙", "张康", "张陌言", "张昕逸",
+                "郑雯锌", "周骏奕", "朱靖宇", "朱诗琪"
+            ]
+        };
+
+        // ======================== 存储成绩数据 ========================
+        let classData = {};
+        Object.keys(students).forEach(cls => {
+            classData[cls] = {};
+            students[cls].forEach(name => {
+                classData[cls][name] = ""; // 初始为空字符串
+            });
+        });
+
+        let currentClass = "15班";
+
+        // ======================== 1. 渲染三栏表格 (竖向填充) ========================
+        function renderStudents() {
+            const container = document.getElementById("tableContainer");
+            container.innerHTML = "";
+
+            const list = students[currentClass];
+            const data = classData[currentClass];
+            const colCount = 3;
+            const colHeight = Math.ceil(list.length / colCount);
+
+            for (let c = 0; c < colCount; c++) {
+                const colDiv = document.createElement("div");
+                colDiv.className = "column";
+
+                const header = document.createElement("div");
+                header.className = "column-header";
+                const start = c * colHeight + 1;
+                const end = Math.min((c + 1) * colHeight, list.length);
+                header.textContent = `名单 (${start}-${end})`;
+
+                const table = document.createElement("table");
+                const thead = document.createElement("thead");
+                thead.innerHTML = "<tr><th style='width: 25%'>学号</th><th style='width: 40%'>姓名</th><th style='width: 35%'>分数</th></tr>";
+                table.appendChild(thead);
+
+                const tbody = document.createElement("tbody");
+
+                for (let r = 0; r < colHeight; r++) {
+                    const index = c * colHeight + r;
+                    if (index >= list.length) break;
+
+                    const name = list[index];
+                    const tr = document.createElement("tr");
+
+                    // 学号
+                    const td1 = document.createElement("td");
+                    td1.textContent = index + 1;
+                    tr.appendChild(td1);
+
+                    // 姓名
+                    const td2 = document.createElement("td");
+                    td2.textContent = name;
+                    tr.appendChild(td2);
+
+                    // 分数输入框
+                    const td3 = document.createElement("td");
+                    const input = document.createElement("input");
+                    input.type = "number";
+                    input.min = "0";
+                    input.max = "150";
+                    input.step = "any";
+                    input.className = "score-input" + (data[name] === "" ? " empty" : "");
+                    input.value = data[name];
+                    
+                    // 分数改变事件
+                    input.oninput = (e) => handleScoreChange(e.target.value, name, input);
+                    
+                    td3.appendChild(input);
+                    tr.appendChild(td3);
+
+                    tbody.appendChild(tr);
+                }
+                table.appendChild(tbody);
+                colDiv.appendChild(header);
+                colDiv.appendChild(table);
+                container.appendChild(colDiv);
+            }
+
+            updateStats();
+        }
+
+        // ======================== 2. 成绩变化处理 ========================
+        function handleScoreChange(value, name, inputElement) {
+            classData[currentClass][name] = value;
+
+            if (value === "") {
+                inputElement.classList.add("empty");
+            } else {
+                inputElement.classList.remove("empty");
+            }
+
+            updateStats();
+        }
+
+        // ======================== 3. 更新统计信息 ========================
+        function updateStats() {
+            const data = classData[currentClass];
+            const list = students[currentClass];
+            let totalCount = list.length;
+            let enteredCount = 0;
+            let scores = [];
+
+            list.forEach(name => {
+                const val = data[name];
+                if (val !== "" && !isNaN(val)) {
+                    enteredCount++;
+                    scores.push(parseFloat(val));
+                }
+            });
+
+            document.getElementById("statTotal").textContent = totalCount;
+            document.getElementById("statEntered").textContent = enteredCount;
+            document.getElementById("statMissing").textContent = totalCount - enteredCount;
+
+            if (scores.length > 0) {
+                const sum = scores.reduce((a, b) => a + b, 0);
+                const avg = (sum / scores.length).toFixed(1);
+                const max = Math.max(...scores);
+                const min = Math.min(...scores);
+
+                document.getElementById("statAvg").textContent = avg;
+                document.getElementById("statMax").textContent = max;
+                document.getElementById("statMin").textContent = min;
+            } else {
+                document.getElementById("statAvg").textContent = "0";
+                document.getElementById("statMax").textContent = "0";
+                document.getElementById("statMin").textContent = "0";
+            }
+        }
+
+        // ======================== 4. 切换班级 ========================
+        document.querySelectorAll('input[name="class"]').forEach(radio => {
+            radio.addEventListener("change", function() {
+                if (this.checked) {
+                    currentClass = this.value;
+                    renderStudents();
+                }
+            });
+        });
+
+        // ======================== 5. 导出为Excel ========================
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            const examName = document.getElementById("examName").value.trim() || "测验成绩";
+
+            Object.keys(classData).forEach(cls => {
+                const wsData = [
+                    [`${cls} ${examName} 成绩单`]
+                ];
+                wsData.push(["班级", cls, "考试名称", examName, "导出日期", new Date().toLocaleDateString()]);
+                wsData.push([]);
+                wsData.push(["学号", "姓名", "成绩"]);
+
+                let validScores = [];
+
+                students[cls].forEach((name, index) => {
+                    const scoreVal = classData[cls][name];
+                    let scoreDisplay = "缺考";
+                    if (scoreVal !== "" && !isNaN(scoreVal)) {
+                        scoreDisplay = parseFloat(scoreVal);
+                        validScores.push(scoreDisplay);
+                    }
+                    wsData.push([index + 1, name, scoreDisplay]);
+                });
+
+                // 底部添加统计行
+                wsData.push([]);
+                if (validScores.length > 0) {
+                    const sum = validScores.reduce((a, b) => a + b, 0);
+                    const avg = (sum / validScores.length).toFixed(2);
+                    const max = Math.max(...validScores);
+                    const min = Math.min(...validScores);
+                    wsData.push(["统计", "参考人数", validScores.length]);
+                    wsData.push(["统计", "平均分", parseFloat(avg)]);
+                    wsData.push(["统计", "最高分", max]);
+                    wsData.push(["统计", "最低分", min]);
+                }
+
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+                ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 12 }];
+                XLSX.utils.book_append_sheet(wb, ws, cls);
+            });
+
+            const fileName = `${examName}_成绩单_${new Date().toLocaleDateString()}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        }
+
+        // ======================== 初始化 ========================
+        window.onload = function() {
+            renderStudents();
+        };
+    </script>
+</body>
+</html>
